@@ -82,7 +82,7 @@ func udpCopyFromUpstream(downstream net.PacketConn, conn *udpConnection) {
 	}
 }
 
-func udpGetSocketFromMap(downstream net.PacketConn, downstreamAddr, saddr net.Addr, logger *slog.Logger,
+func udpGetSocketFromMap(downstream net.PacketConn, downstreamAddr, saddr net.Addr, daddr net.Addr, logger *slog.Logger,
 	connMap map[string]*udpConnection, socketClosures chan<- string) (*udpConnection, error) {
 	connKey := ""
 	if saddr != nil {
@@ -94,8 +94,12 @@ func udpGetSocketFromMap(downstream net.PacketConn, downstreamAddr, saddr net.Ad
 	}
 
 	targetAddr := Opts.TargetAddr6
-	if netip.MustParseAddr(downstreamAddr.String()).Is4() {
-		targetAddr = Opts.TargetAddr4
+	if !Opts.DynamicDestination {
+		if netip.MustParseAddr(downstreamAddr.String()).Is4() {
+			targetAddr = Opts.TargetAddr4
+		}
+	} else {
+		targetAddr = netip.MustParseAddrPort(daddr.String())
 	}
 
 	logger = logger.With(slog.String("downstreamAddr", downstreamAddr.String()), slog.String("targetAddr", targetAddr.String()))
@@ -159,7 +163,7 @@ func UDPListen(listenConfig *net.ListenConfig, logger *slog.Logger, errors chan<
 			continue
 		}
 
-		saddr, _, restBytes, err := PROXYReadRemoteAddr(buffer[:n], UDP)
+		saddr, daddr, restBytes, err := PROXYReadRemoteAddr(buffer[:n], UDP)
 		if err != nil {
 			logger.Debug("failed to parse PROXY header", "error", err, slog.String("remoteAddr", remoteAddr.String()))
 			continue
@@ -178,7 +182,7 @@ func UDPListen(listenConfig *net.ListenConfig, logger *slog.Logger, errors chan<
 			}
 		}
 
-		conn, err := udpGetSocketFromMap(ln, remoteAddr, saddr, logger, connectionMap, socketClosures)
+		conn, err := udpGetSocketFromMap(ln, remoteAddr, saddr, daddr, logger, connectionMap, socketClosures)
 		if err != nil {
 			continue
 		}

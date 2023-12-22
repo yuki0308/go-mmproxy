@@ -44,19 +44,23 @@ func tcpHandleConnection(conn net.Conn, logger *slog.Logger) {
 		return
 	}
 
-	saddr, _, restBytes, err := PROXYReadRemoteAddr(buffer[:n], TCP)
+	saddr, daddr, restBytes, err := PROXYReadRemoteAddr(buffer[:n], TCP)
 	if err != nil {
 		logger.Debug("failed to parse PROXY header", "error", err, slog.Bool("dropConnection", true))
 		return
 	}
 
 	targetAddr := Opts.TargetAddr6
-	if saddr == nil {
-		if netip.MustParseAddrPort(conn.RemoteAddr().String()).Addr().Is4() {
+	if !Opts.DynamicDestination {
+		if saddr == nil {
+			if netip.MustParseAddrPort(conn.RemoteAddr().String()).Addr().Is4() {
+				targetAddr = Opts.TargetAddr4
+			}
+		} else if netip.MustParseAddrPort(saddr.String()).Addr().Is4() {
 			targetAddr = Opts.TargetAddr4
 		}
-	} else if netip.MustParseAddrPort(saddr.String()).Addr().Is4() {
-		targetAddr = Opts.TargetAddr4
+	} else {
+		targetAddr = netip.MustParseAddrPort(daddr.String())
 	}
 
 	clientAddr := "UNKNOWN"
