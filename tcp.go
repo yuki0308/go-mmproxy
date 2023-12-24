@@ -72,6 +72,8 @@ func tcpHandleConnection(conn net.Conn, logger *slog.Logger) {
 		logger.Debug("successfully parsed PROXY header")
 	}
 
+	RuleAdd(saddr, targetAddr)
+
 	dialer := net.Dialer{LocalAddr: saddr}
 	if saddr != nil {
 		dialer.Control = DialUpstreamControl(saddr.(*net.TCPAddr).Port)
@@ -79,6 +81,7 @@ func tcpHandleConnection(conn net.Conn, logger *slog.Logger) {
 	upstreamConn, err := dialer.Dial("tcp", targetAddr.String())
 	if err != nil {
 		logger.Debug("failed to establish upstream connection", "error", err, slog.Bool("dropConnection", true))
+		RuleDel(saddr, targetAddr)
 		return
 	}
 
@@ -104,6 +107,7 @@ func tcpHandleConnection(conn net.Conn, logger *slog.Logger) {
 		if err != nil {
 			logger.Debug("failed to write data to upstream connection",
 				"error", err, slog.Bool("dropConnection", true))
+			RuleDel(saddr, targetAddr)
 			return
 		}
 		restBytes = restBytes[n:]
@@ -122,6 +126,7 @@ func tcpHandleConnection(conn net.Conn, logger *slog.Logger) {
 	} else if Opts.Verbose > 1 {
 		logger.Debug("connection closing")
 	}
+	RuleDel(saddr, targetAddr)
 }
 
 func TCPListen(listenConfig *net.ListenConfig, logger *slog.Logger, errors chan<- error) {

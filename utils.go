@@ -7,7 +7,10 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"syscall"
+
+	"github.com/vishvananda/netlink"
 )
 
 type Protocol int
@@ -85,4 +88,30 @@ func DialUpstreamControl(sport int) func(string, string, syscall.RawConn) error 
 		}
 		return syscallErr
 	}
+}
+
+func RuleAdd(client net.Addr, target netip.AddrPort) error {
+	s := netip.MustParseAddrPort(client.String())
+	daddr := net.IP(s.Addr().AsSlice())
+	rule := netlink.NewRule()
+	rule.Family = 4
+	rule.Table = 100
+	rule.Src = &net.IPNet{IP: net.IPv4(172, 0, 0, 0), Mask: net.CIDRMask(8, 32)}
+	rule.Dst = &net.IPNet{IP: daddr, Mask: net.CIDRMask(32, 32)}
+	rule.Dport = netlink.NewRulePortRange(s.Port(), s.Port())
+	rule.Sport = netlink.NewRulePortRange(target.Port(), target.Port())
+	return netlink.RuleAdd(rule)
+}
+
+func RuleDel(client net.Addr, target netip.AddrPort) error {
+	s := netip.MustParseAddrPort(client.String())
+	daddr := net.IP(s.Addr().AsSlice())
+	rule := netlink.NewRule()
+	rule.Family = 4
+	rule.Table = 100
+	rule.Src = &net.IPNet{IP: net.IPv4(172, 0, 0, 0), Mask: net.CIDRMask(8, 32)}
+	rule.Dst = &net.IPNet{IP: daddr, Mask: net.CIDRMask(32, 32)}
+	rule.Dport = netlink.NewRulePortRange(s.Port(), s.Port())
+	rule.Sport = netlink.NewRulePortRange(target.Port(), target.Port())
+	return netlink.RuleDel(rule)
 }
