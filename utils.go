@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/netip"
 	"syscall"
+	"time"
 
 	"github.com/vishvananda/netlink"
 )
@@ -104,6 +105,8 @@ func RuleAdd(client net.Addr, target netip.AddrPort) error {
 }
 
 func RuleDel(client net.Addr, target netip.AddrPort) error {
+	time.Sleep(3 * time.Second)
+
 	s := netip.MustParseAddrPort(client.String())
 	daddr := net.IP(s.Addr().AsSlice())
 	rule := netlink.NewRule()
